@@ -1,0 +1,111 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id                  String              @id @default(uuid())
+    username            String
+    email               String              @unique
+    password            String?
+    provider            String?
+    refreshToken        String?
+    createdAt           DateTime            @default(now())
+    updatedAt           DateTime            @updatedAt
+    workspaces          Workspace[]         @relation("WorkspaceMembers")
+    channels            Channel[]           @relation("ChannelMembers")
+    messages            Message[]
+    MessageStatuses     MessageStatus[]
+    sentMessages        DirectMessage[]     @relation("SentMessages")
+    receivedMessages    DirectMessage[]     @relation("ReceivedMessages")
+}
+
+model Workspace {
+    id          String     @id @default(uuid())
+    name        String
+    createdAt   DateTime   @default(now())
+    updatedAt   DateTime   @updatedAt
+    users       User[]     @relation("WorkspaceMembers")
+    channels    Channel[]
+    createdBy   String
+    isPrivate   Boolean    @default(false)
+    about       String
+}
+
+model Channel {
+    id          String     @id @default(uuid())
+    name        String
+    isPrivate   Boolean    @default(false)
+    createdAt   DateTime   @default(now())
+    updatedAt   DateTime   @updatedAt
+    workspaceId String
+    workspace   Workspace  @relation(fields: [workspaceId], references: [id])
+    members     User[]     @relation("ChannelMembers")
+    messages    Message[]
+}
+
+model DirectMessage {
+    id              String              @id @default(uuid())
+    content         String          
+    createdAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt
+    senderId        String          
+    sender          User                @relation("SentMessages", fields: [senderId], references: [id])
+    receiverId      String          
+    receiver        User                @relation("ReceivedMessages", fields: [receiverId], references: [id])
+    parentId        String?         
+    parent          DirectMessage?      @relation("MessageReplies", fields: [parentId], references: [id])
+    replies         DirectMessage[]     @relation("MessageReplies")
+    seen            Boolean             @default(false)
+    status          Status              @default(Delivered)
+}
+
+model Message {
+    id              String              @id @default(uuid())
+    content         String          
+    createdAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt
+    userId          String          
+    user            User                @relation(fields: [userId], references: [id])
+    channelId       String          
+    channel         Channel             @relation(fields: [channelId], references: [id])
+    parentId        String?         
+    parent          Message?            @relation("MessageReplies", fields: [parentId], references: [id])
+    replies         Message[]           @relation("MessageReplies")
+    allDelivered    Boolean             @default(false)
+    allSeen         Boolean             @default(false)
+    statuses        MessageStatus[]
+}
+
+model MessageStatus {
+    id          String                  @id @default(uuid())
+    messageId   String
+    message     Message                 @relation(fields: [messageId], references: [id])
+    userId      String
+    user        User                    @relation(fields: [userId], references: [id])
+    status      Status                  @default(Delivered)
+    updatedAt   DateTime                @updatedAt
+
+    @@unique([messageId, userId])
+}
+
+model Url {
+    id              String     @id @default(uuid())
+    token           String     @unique
+}
+
+model Invite {
+    token           String     @unique
+    multipleUsage   Boolean
+    isUsed          Boolean?
+}
+
+enum Status {
+    Failed
+    Delivered
+    Seen
+}
